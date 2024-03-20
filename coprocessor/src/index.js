@@ -8,23 +8,30 @@ const app = express();
  * In a real code base, you would likely have a consumer provided token in a header which would be passed down to the "auth service", not the hard coding that this example does
  */
 const processSupergraphRequestStage = async (payload) => {
+  if (!payload.context.entries["apollo_authorization::policies::required"]) {
+    return payload
+  }
+
   // Get the unevaluated policies
-  const policies = Object.keys(payload.context.entries["apollo_authorization::policies::required"]);
+  const policyEntries = Object.keys(payload.context.entries["apollo_authorization::policies::required"]);
 
   // Send the list of policies downstream to the auth service
-  const response = await fetch("http://localhost:3005/policy/evaluate", {
+  const response = await fetch("http://localhost:8181/v1/data", {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-    },
     body: JSON.stringify({
-      policies,
+      input: {
+        headers: {
+          authorization: payload.headers.authorization ? payload.headers.authorization[0] : null
+        },
+        policyEntries
+      }
     }),
   }).then((res) => res.json());
 
-  // Map the evaluated policies back into the payload for the Router
-  response.policies.forEach((policy) => {
-    payload.context.entries["apollo_authorization::policies::required"][policy.scope] = policy.result;
+  const responseKeys = Object.keys(response.result)
+
+  Object.entries(response.result).forEach(([policyKey, policyValue]) => {
+    payload.context.entries["apollo_authorization::policies::required"][policyValue.authorization_key] = policyValue.allow
   });
 
   return payload;

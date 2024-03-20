@@ -7,3 +7,4 @@ coprocessor:
   supergraph:
     request:
       context: true
+      headers: true
